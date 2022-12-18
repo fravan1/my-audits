@@ -15,3 +15,17 @@ I found 7 issues and [submitted](./code4rena/prePO/findings.md) them to Code4ren
 
 _Outcome_
 Pending
+
+## Tigris
+
+_Summary_
+5 day Code4rena contest ended on Dec 16
+
+_Background_
+Tigris is a decentralized trading platform with unique oracle system where users sign the price from other CEXs. Tigris issues a trade NFT and tarders can deposit tgUSD (stable USD token issued by platform) or other assets (USDT/DAI) as collateral. Traders can place leveraged bets on crypto, commodity and forex. Current audit, I reviewed the collateral management, margin calculations, opening closing positions, adding leverage and margin to existing positions and and P/L computation.
+
+_Submission_
+I found 7 issues and [submitted](./code4rena/Tigris/findings.md) them to Code4rena.
+
+_Outcome_
+Pending
