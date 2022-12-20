@@ -29,3 +29,17 @@ I found 7 issues and [submitted](./code4rena/Tigris/findings.md) them to Code4re
 
 _Outcome_
 Pending
+
+## Caviar
+
+_Summary_
+3 day Code4rena contest ended on Dec 19
+
+_Background_
+Caviar is a NFT AMM that borrows ideas of Uniswap AMM model but to the NFT world. Caviar allows users to fractionalize their NFT's, deposit into the AMM pool and allow LPs to earn fees and users to fractionally buy/sell NFTs deposited in the pool. Project improves liquidity over in the illiquid NFT market
+
+_Submission_
+I found 4 issues and [submitted](./code4rena/Caviar/submittedFindings.md) them to Code4rena.
+
+_Outcome_
+Pending
