@@ -242,3 +242,4 @@ function removeQuote(uint256 lpTokenAmount) public view returns (uint256, uint25
     return (baseTokenOutputAmount, fractionalTokenOutputAmount);
 }
 ```
+`
