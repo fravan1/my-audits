@@ -22,7 +22,77 @@
     - transfer collateral asset for `assetAmount` from user to depository
     - Builds an internal struct `InternalMintParams` which passes asset, amount, depository, minAmountOut, receiver to `_mint` function
     - `_mint`
-      -
+
+      - checks if asset token is in whitelisted assets list or reverts
+      - calls the `deposit` function in depository that returns the `amountOut` of quote token
+      - `deposit` in depository
+
+            - goes to `perpDepository` deposit() implementation
+            - `deposit` is defined in `IDepository` interface
+            - implementation is in each specific depository
+            - `deposit` amount takes `asset`, `amount` -> can only be called by `Controller`
+            - has implementation if `asset` is base token or quote token
+            - right now, from controller -> we will access base token implementation
+            - calls `_depositAsset` function
+            - `_depositAsset`
+                - increases `netAssetDeposits` of deposits by asset amount passed
+                - approves `amount` to be accessed by `vault`
+                - calls `vault` deposit - external protocol function - lets assume it deposits amount into the vault against given `account` which is depository
+            - calls `_openShort` function - whenever we deposit asset, we need to open short position on Perp DEX
+            - `_openShort`
+                - returns `baseAmount` and `quoteAmount`
+                - passes to `_placePerpOrder` with amount, `short`, `exactInput`
+                - `_placePerpOrder`
+                    - Creates a struct called `OpenPositionParams` as part of IClearingHouse ( this is Perp Protocol contract)
+                        - takes `baseToken`,
+                        - `baseToQuote` - true (short base)/ false (long base)
+                        - `isExactInput` - true -> we specify exact input, false - exact output
+                        - `amount` - amount for which perp position is opened
+                        - `oppositeAmountBound` - not relevant in our case (0)
+                        - `deadline` - set to block.timestamp
+                        - `sqrtPriceLimitX96` -similar to uniswap v3
+                    - call `clearingHouse.openPosition()` - opens position -> returns `baseAmount` and `quoteAmount` that is the position size (`baseAmount` * `price` at which perp executed)
+                    - calculated `feeamount` by passing `quoteAmount` to `_calculatePerpOrderFeeAmount`
+                    - `feeamount` is `protocol fee * quote amount`
+                    - fee is added to `totalFeesPaid`
+
+
+                - adds `quoteAmount` to `redeemableUnderManagement`
+                - `_checkSoftCap()` checks if quoteAmount > `redeemableSoftCap` assigned for the depository (each depository has max cap attached for redeemable under management)
+                - returns `quoteAmount`
+
+    - checks is `quoteAmount` < `minAmount` - reverts if it is
+    - mints `quoteAmount` to `receiver`
+    - returns `quoteAmount`
+
+- `redeem`
+
+  - takes `assetToken`, `redeemAmount`, `minAmountOut`, `receiver`
+  - creates a internal struct `InternalRedeemParams` with above parameters
+  - Calls `_redeem(params)`
+  - checks whitelisted asset
+  - checks allowance for redeeming `redeemAmount` from user
+  - finds `depository` to redeem
+  - calls `depository.redeem` by passing `asset` and `amountToRedeem`
+  - `depository.redeem()`
+
+    - can only be called by controller
+    - can handle asset token redeem and quote token redeem (disabled currently)
+    - Calls `_openLong()`
+
+      - passes `_placePerpOrder` with `amount`, `isLong`, `isExactInput`
+      - `_placePerpOrder`
+
+        - call `clearingHouse.openPosition()` - opens position -> returns `baseAmount` and `quoteAmount` that is the position size (`baseAmount` \* `price` at which perp executed)
+        - calculated `feeamount` by passing `quoteAmount` to `_calculatePerpOrderFeeAmount`
+        - `feeamount` is `protocol fee * quote amount`
+        - fee is added to `totalFeesPaid`
+
+      - subtracts `amount` from `redeemableUnderManagement`
+
+- Call `withdrawAsset`
+
+- reduce `
 
 ### Tests
 
@@ -177,9 +247,203 @@
 
 - `RageDepositoryFixture` - TBD
 
-**Tests**
+**Manual Tests**
+
+- `Deploy Core`
+
+  -
 
 - ## `UXDControllerTests`
+
+### Deployment order
+
+- `01-deploy-core`
+
+  - checks if Optimism network
+  - deploys contracts
+    - deploy `UXDController` proxy with `WETH` contract (from config)
+    - deploy `UXDRouter`
+    - deploy `UXDToken` with `UXDController` address
+  - verify contracts
+    - verify controller proxy
+    - verify controller implementation (get implementation upgrades.erc1967.getImplementationAddress(controller))
+    - verify router
+    - verify UXD
+    - persist artifacts (controller / router / UXD)
+  - setup
+    - whitelist `WETH` asset in controller
+    - whitelist `USDC` asset in controller
+    - update router address in controller
+    - mintcap set to 2 million UXD tokens
+    - set Redeemable token in controller as UXD
+    - set UXD local mint cap as 2 million UXD
+  - save
+    - save `controller`, `router`, `uxd` addresses to `./addresses/optimism/core.json` file
+
+- `02-deploy-perp-depository`
+
+  - get config by `loadConfig(hre)`
+  - load Contracts by `loadCoreContracts` - loads all 3 contracts in previous deploy step (controller/router/uxd)
+  - `deployContracts`
+    - get `PerpDepository` contract
+    - deploy using addresses of `PerpVault`, `PerpClearingHouse`, `PerpMarketRegistry`, `PerpVETHMarket`, `WETH`, `USDC` and `UXDController` address in previous step
+    - Since it is a proxy contract (uups), we use `upgrades.deployProxy` and `{kind: "uups"}`
+    - deploy UniSwapper with uniswap V3 address in config file
+  - `verifyContracts`
+
+    - verify depository (why not passing inputs while verifuing)
+    - get `depositoryImpl` address using `upgrades.erc1967.getImplementationAddress(depository.address)` to get implementation address
+    - verify `depositoryImpl`
+    - verify `uniSwapper`
+
+  - `setup`
+
+    - get the `uxdRouter` contract
+    - set redeemable softcap in depository (this is the UXD exposure limit in Perp)
+    - `setSpotSwapper` - set address of swapper inside depository
+    - In the router contract, register new depository with `depository.address` and `WETH` address
+    - In the router contract, register new depository with `depository.address` and `USDC` address
+
+  - `save`
+    - save depository created in `./addresses/optimism/depositories.json`
+
+- `3_deposit_insurance`
+
+  - get signers - `admin` and `bob`
+  - load config parameters - `loadConfig(hre)`
+  - get depositories address - `loadDepositories(hre)`
+  - get `PerpDepository` instance with contract and address above
+  - use `ERC20` contract and initiate a `USDC` instance using USDC address in config
+  - `10` USDC -> approve 10 USDC
+  - Use `depositInsurance` to deposit `10 USDC` from `admin` address
+
+- `4_mint`
+
+  - get signers - `admin` and `bob`
+  - load config parameters - `loadConfig(hre)`
+  - load core contracts - `loadCoreContracts(hre)`
+  - get `UXDController` contract
+  - get `UXDToken` contract
+  - Attach `WETH9` address to `ERC20` contract
+  - Approve `0.01` WETH to be spent by `UXDController`
+  - Mint UXD token by calling `mint` function on `UXDController` -> and send it to `config.addresses.Deployer`
+  - Check `UXDTotalSupply` by calling `totalSupply` on UXDtoken
+
+- `5_redeem`
+
+  - load config parameters - `loadConfig(hre)`
+  - load core contracts - `loadCoreContracts(hre)`
+  - get signers - `admin` and `bob`
+  - get `UXDController` by using controller address
+  - get `UXDToken` with uxd token
+  - get `totalSupply`
+  - call `redeem` on controller with `weth` token, `uxd` token, minAmout =0, deployer address (receiver)
+
+- `6_mint_with_eth`
+
+  - get signers - `admin` and `bob`
+  - load config parameters - `loadConfig(hre)`
+  - load core contracts - `loadCoreContracts(hre)`
+  - get `UXDController` contract instance
+  - get `UXDToken` contract instance
+  - take `eth` amount of 0.01
+  - get `totalSupply` of UXD token
+  - mint with `eth` - `0` min amount, and address is `deployer`, value is 0.01 eth
+  - get new `totalSupply` of UXD token
+
+- `7_redeem_eth`
+
+  - load config parameters - `loadConfig(hre)`
+  - load core contracts - `loadCoreContracts(hre)`
+  - get signers - `admin`
+  - get `UXDController` by using controller address
+  - get `UXDToken` with uxd token
+  - call `redeemForEth` on controller with `uxdAmount`, minAmountOut =0, receiver = `config.addresses.Deployer`
+  - get total `uxdSupply`
+
+- `8_withdraw_insurance`
+
+  - load config parameters - `loadConfig(hre)`
+  - load core contracts - `loadCoreContracts(hre)`
+  - get signers - `admin` and `bob`
+  - get depositories address - `loadDepositories(hre)`
+  - get `PerpDepository` contract instance
+  - get `10` USDC
+  - withdraw 10 USDC and send to `tokenReceiver` address in config
+
+- `9_deploy_router` **Redundant**
+
+  - load config parameters - `loadConfig(hre)`
+  - load core contracts - `loadCoreContracts(hre)`
+  - get `UXDRouter` instance
+
+- `10_deploy_perp_account_proxy`
+
+  - Get `PerpAccountProxy` contract
+  - deploy using `PerpAccountBalance` and `PerpClearingHouse` addresses from `config.contracts`
+  - verify contract
+  - save address to `addresses/optimism/perpAccountProxy.json`
+
+- `11_quote_mint`
+
+  - load config parameters - `loadConfig(hre)`
+  - load core contracts - `loadCoreContracts(hre)`
+  - get depositories address - `loadDepositories(hre)`
+  - get instance of `UXDController`
+  - get instance of `PerpDepository`
+  - get instance of `uxdToken` and `usdc`
+  - approve for `controller` to spend 0.01 usdc
+  - get `unrealizedPnL` from depository
+  - get total `uxd` supply
+  - mint with quote token (`USDC`)-> amount 0.01 usdc, and send to `config.addresses.TokenReceiver`
+  - get total `uxd` supply
+  - get total `unrealizedPnL`
+
+- `12_quote_redeem`
+
+  - load config parameters - `loadConfig(hre)`
+  - load core contracts - `loadCoreContracts(hre)`
+  - get instance of `UXDController`
+  - get instance of `uxdToken`
+  - get totalsupply of `uxd`
+  - approve spend of `150` uxd
+  - redeem 150 `uxd` using `usdc` as token
+  - get total `uxd` supply
+
+- `13_rebalance_negative_pnl`
+
+  - load config parameters - `loadConfig(hre)`
+  - load core contracts - `loadCoreContracts(hre)`
+  - get depositories address - `loadDepositories(hre)`
+  - get periphery (`perpAccountProxy` contract) - `loadPeriphery()`
+  - get instance of `perpDepository`
+  - get instance of `perpAccountProxy`
+  - get position value by calling `depository.getPositionValue()`
+  - get total position size by calling `proxy.getTotalPositionSize` on `perpAccountProxy` - pass it `PerpDEpository` address and `PerpVETHMarket` address
+  - take usdc = 4.7, polarity is -1 (negativePL)
+  - Get `usdc` contract instance
+  - approve 4.7 usdc spend by `depository` address
+  - call `rebalanceLite` on `depository` wuth `usdAmount`, `polarity`, `targetPrice` (0) and `admin` address
+  - get `positionValue` by calling `depository.getPositionValue()`
+  - get `positionSize` by calling `proxy.getTotalPositionSize` on `perpAccountProxy`
+  - `getUnrealizedPnL`
+
+- `13_rebalance_positive_pnl`
+  - load config parameters - `loadConfig(hre)`
+  - load core contracts - `loadCoreContracts(hre)`
+  - get depositories address - `loadDepositories(hre)`
+  - get periphery (`perpAccountProxy` contract) - `loadPeriphery()`
+  - get `admin` signer
+  - get instance of `perpDepository`
+  - get instance of `perpAccountProxy`
+  - get `uxd` token instance
+  - get total `uxd` supply - `uxdToken.totalSupply()`
+  - get `positionValue` by calling `depository.getPositionValue()`
+  - get `positionSize` by calling `proxy.getTotalPositionSize` on `perpAccountProxy`
+  - get `WETH` contract instance
+  - get `unrealizedPnL` by `depository.getUnrealizedPnl()`
+  - approve 0.1 `WETH` spending by `depository`
+  -
 
 ### Questions
 
@@ -190,3 +454,9 @@
 3. Who can do Quote mint? And when is it done?
 
 4. Single sided rebalancing - how will it ensure delta neutrality?
+
+5. Who is paying fees on opening and closing of perps - where is that fees being deducted from?
+
+6. When `withdraw` or `deposit` is paused -> contract reverts -> withdrawal stops -> this will be a challenge -> how will this be mitigated??
+
+7.
