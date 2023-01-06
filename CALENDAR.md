@@ -5,7 +5,7 @@
 | PrePO    | Code4rena | 10 Dec 22 | 13 Dc 22  | Completed |     1     |      6      |    1     | Pending |
 | Tigris   | Code4rena | 10 Dec 22 | 17 Dec 22 | Completed |     4     |      3      |    1     | Pending |
 | Caviar   | Code4rena | 13 Dec 22 | 20 Dec 22 | Completed |     1     |      2      |    1     | Pending |
-| GoGoPool | Code4rena | 12 Dec 22 | 03 Jan 23 |  Active   |     -     |      -      |    -     |    -    |
+| GoGoPool | Code4rena | 12 Dec 22 | 03 Jan 23 | Completed |     4     |      2      |    -     | Pending |
 | Notional | Sherlock  | 02 Jan 23 | 09 Jan 23 | Upcoming  |     -     |      -      |    -     |    -    |
 | Astaria  | Code4rena | 06 Jan 23 | 20 Jan 23 | Upcoming  |     -     |      -      |    -     |    -    |
 | Reserve  | Code4rena | 07 Jan 23 | 21 Jan 23 | Upcoming  |     -     |      -      |    -     |    -    |
