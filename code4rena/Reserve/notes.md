@@ -27,3 +27,5 @@ RTokenP1
 
 - Inherits ERC20MetaUpgradeable
 - Each RToken comes with a mandate (eg. capital preservation above all else)
+- issuance rate - fraction of supply issued per block. must be < max rate
+- 
