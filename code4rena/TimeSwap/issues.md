@@ -78,4 +78,7 @@ DONE
 
     - only if there is no liquidity
 
-18.
+18. Chk what happens if I setyp a pool, option pair with 0 strike -> can i do this
+
+19. Chk what happens if I setup a pool with protocol fees > transaction fees -> is this ok??
+
