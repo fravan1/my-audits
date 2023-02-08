@@ -107,7 +107,7 @@ Suppose vault had 10 depositors of 100 USDC each. `userWithdrawLimitPerPeriod` i
 
 _Recommendation_
 
-Just like `globalNetDepositAmount` being tracked in `DepositRecord` contract, a `globalUserDepositAmount` should be tracked that is a cumulative sum of all user deposits (excluding deposits made by protocol itself).
+Just like `globalNetDepositAmount` being tracked in `DepositRecord` contract, a `globalUserDepositAmount` should be tracked that is a cumulative sum of all user deposits (excluding deposits made by protocol itself). [PrePO docs](https://docs.prepo.io/) and [developer docs](https://docs.prepo.io/developer/core-contracts)
 
 Check following condition before allowing manager to withdraw funds
 
